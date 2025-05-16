@@ -4,6 +4,8 @@ import { Container, Typography, Paper, CircularProgress, Box, Table, TableBody, 
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import ErrorIcon from '@mui/icons-material/Error';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import codaApi from './services/codaApi';
 import domoApi from './services/domoApi';
 
@@ -20,20 +22,25 @@ function App() {
   const [columns, setColumns] = useState([]);
   const [domoError, setDomoError] = useState(null);
   const [isPushingToDomo, setIsPushingToDomo] = useState(false);
-  //////////////////////////////////////////CODA DOC ID////////////////////////////////////////////////////////
+  const [pages, setPages] = useState([]);
+  const [selectedTableId, setSelectedTableId] = useState('grid-AugbPR9_CK');
+  const [isStructureExpanded, setIsStructureExpanded] = useState(false);
   const [docId] = useState('aICF0Nr9qq');
   //////https://coda.io/d/Jarons-Coda-Playground_daICF0Nr9qq/Arbitrary-Data_suspmNrM#New-Table_tu75UX0j//////////
 
+  const fetchPages = async () => {
+    try {
+      const pagesData = await codaApi.getPages(docId);
+      console.log('Pages data:', pagesData);
+      setPages(pagesData.items || []);
+    } catch (err) {
+      console.error('Error fetching pages:', err);
+    }
+  };
 
-  const fetchData = async () => {
+  const fetchData = async (tableId = selectedTableId) => {
     try {
       setLoading(true);
-  ///////////////////////////////////////CODA TABLE IDS///////////////////////////////////////////////////////////
-      //const tableId = 'grid-AugbPR9_CK';  //first DATA TABLE
-      const tableId = 'grid-VhEQ75UX0j';  //second test
-  //////Must pull table ID from Elements in DEV Tools data-object-id="grid-AugbPR9_CK"//////////////////////////
-
-      
       const [tableMetadata, columnMetadata, rows] = await Promise.all([
         codaApi.getTableMetadata(docId, tableId),
         codaApi.getColumnMetadata(docId, tableId),
@@ -55,11 +62,9 @@ function App() {
       
       // Sort columns: known columns first in specified order, then any new columns
       const sortedColumns = [
-        // First add known columns in the specified order
         ...knownColumnOrder
           .map(id => allColumns.find(col => col.id === id))
           .filter(Boolean),
-        // Then add any new columns that aren't in the known order
         ...allColumns.filter(col => !knownColumnOrder.includes(col.id))
       ];
 
@@ -87,8 +92,16 @@ function App() {
   };
 
   useEffect(() => {
+    fetchPages();
     fetchData();
+    setIsStructureExpanded(false);
   }, []);
+
+  const handleTableClick = (tableId) => {
+    setSelectedTableId(tableId);
+    setIsStructureExpanded(false);
+    fetchData(tableId);
+  };
 
   if (loading) {
     return (
@@ -122,26 +135,54 @@ function App() {
             color: '#ffffff',
             textShadow: '0 0 .2px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.5)',
             fontWeight: 'bold',
-            letterSpacing: '1px'
+            letterSpacing: '1px',
+            textAlign: { xs: 'center', sm: 'left' }
           }}>
             Coda API Data
           </Typography>
-          <Button 
-            variant="contained" 
-            startIcon={<RefreshIcon />}
-            onClick={fetchData}
-          >
-            Refresh
-          </Button>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            order: { xs: -1, sm: 0 },
+            ml: { xs: 'auto', sm: 0 }
+          }}>
+            <Button 
+              variant="contained" 
+              onClick={() => {
+                setIsStructureExpanded(false);
+                fetchData();
+              }}
+              sx={{
+                minWidth: { xs: 'auto', sm: 'inherit' },
+                p: { xs: 1, sm: 1 },
+                height: { xs: 'auto', sm: '36px' }
+              }}
+            >
+              <RefreshIcon sx={{ display: { xs: 'block', sm: 'none' } }} />
+              <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
+                <RefreshIcon />
+                Refresh
+              </Box>
+            </Button>
+          </Box>
           <Box display="flex" alignItems="center" gap={1}>
             <Button 
               variant="contained" 
               color="secondary"
-              startIcon={<CloudUploadIcon />}
               onClick={pushToDomo}
               disabled={isPushingToDomo || !data}
+              sx={{
+                minWidth: { xs: 'auto', sm: 'inherit' },
+                p: { xs: 1, sm: 1 },
+                height: { xs: 'auto', sm: '36px' }
+              }}
             >
-              Push to Domo
+              <CloudUploadIcon sx={{ display: { xs: 'block', sm: 'none' } }} />
+              <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
+                <CloudUploadIcon />
+                Push to Domo
+              </Box>
             </Button>
             {domoError && (
               <Tooltip title={domoError}>
@@ -151,23 +192,113 @@ function App() {
           </Box>
         </Box>
 
-{/*///////////Structure block////////////////////////////////////////////////////*/}
         <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Structure
-          </Typography>
+          <Box display="flex" alignItems="center" gap={1} mb={1}>
+            <Typography variant="h6">
+              Structure
+            </Typography>
+            <Button
+              onClick={() => setIsStructureExpanded(!isStructureExpanded)}
+              endIcon={isStructureExpanded ? <ExpandLessIcon sx={{ fontSize: 32 }} /> : <ExpandMoreIcon sx={{ fontSize: 32 }} />}
+              sx={{ 
+                minWidth: 'auto', 
+                p: 0.5,
+                height: '32px',
+                '& .MuiButton-endIcon': {
+                  margin: 0
+                }
+              }}
+            />
+          </Box>
           <Typography variant="body1">
             Document: (ID: {docId})
           </Typography>
-          <Typography variant="body1" sx={{ ml: 2 }}>
-            └─ Page: {data?.metadata?.parent?.name} (ID: {data?.metadata?.parent?.id})
-          </Typography>
-          <Typography variant="body1" sx={{ ml: 4 }}>
-            └─ Table: {data?.metadata?.name} (ID: {data?.metadata?.id})
-          </Typography>
+          {isStructureExpanded && pages && pages.length > 0 ? (
+            pages.map((page) => {
+              // Check if this is a subpage
+              const isSubpage = page.parent?.type === 'page';
+              const parentPage = isSubpage ? pages.find(p => p.id === page.parent?.id) : null;
+              
+              // Only show top-level pages and their subpages
+              if (!isSubpage) {
+                return (
+                  <Box key={page.id}>
+                    <Typography variant="body1" sx={{ ml: 2 }}>
+                      └─ Page: {page.name} (ID: {page.id})
+                    </Typography>
+                    {/* Show subpages */}
+                    {pages
+                      .filter(p => p.parent?.id === page.id)
+                      .map(subpage => (
+                        <Box key={subpage.id}>
+                          <Typography variant="body1" sx={{ ml: 4 }}>
+                            └─ Page: {subpage.name} (ID: {subpage.id})
+                          </Typography>
+                          {/* Show tables for this subpage */}
+                          {subpage.tables && subpage.tables.length > 0 && (
+                            subpage.tables.map((table) => (
+                              <Typography 
+                                key={table.id} 
+                                variant="body1" 
+                                sx={{ 
+                                  ml: 6,
+                                  cursor: 'pointer',
+                                  color: table.id === selectedTableId ? 'primary.main' : 'secondary.main',
+                                  '&:hover': {
+                                    color: 'primary.main',
+                                    textDecoration: 'underline'
+                                  }
+                                }}
+                                onClick={() => handleTableClick(table.id)}
+                              >
+                                └─ Table: {table.name} (ID: {table.id})
+                              </Typography>
+                            ))
+                          )}
+                        </Box>
+                      ))}
+                    {/* Show tables for the main page */}
+                    {page.tables && page.tables.length > 0 && (
+                      page.tables.map((table) => (
+                        <Typography 
+                          key={table.id} 
+                          variant="body1" 
+                          sx={{ 
+                            ml: 4,
+                            cursor: 'pointer',
+                            color: table.id === selectedTableId ? 'primary.main' : 'secondary.main',
+                            '&:hover': {
+                              color: 'primary.main',
+                              textDecoration: 'underline'
+                            }
+                          }}
+                          onClick={() => handleTableClick(table.id)}
+                        >
+                          └─ Table: {table.name} (ID: {table.id})
+                        </Typography>
+                      ))
+                    )}
+                  </Box>
+                );
+              }
+              return null;
+            })
+          ) : !isStructureExpanded && data?.metadata ? (
+            <Box>
+              <Typography variant="body1" sx={{ ml: 2 }}>
+                └─ Page: {data.metadata.parent?.name} (ID: {data.metadata.parent?.id})
+              </Typography>
+              <Typography variant="body1" sx={{ ml: 4 }}>
+                └─ Table: {data.metadata.name} (ID: {data.metadata.id})
+              </Typography>
+            </Box>
+          ) : (
+            <Typography variant="body1" sx={{ ml: 2, color: 'text.secondary' }}>
+              Loading pages...
+            </Typography>
+          )}
         </Paper>
 
-{/*///////////Table block////////////////////////////////////////////////////*/}
         <Paper elevation={3} sx={{ p: 3, mt: 2 }}>
           <Typography variant="h6" gutterBottom>
             Table: {data?.metadata?.name}
@@ -203,9 +334,6 @@ function App() {
           </TableContainer>
         </Paper>
 
-
-
-{/*///////////Data block////////////////////////////////////////////////////*/} 
         <Paper elevation={3} sx={{ p: 3, mt: 4 }}>
           <Typography variant="h6" gutterBottom>
             Raw Data

@@ -170,6 +170,62 @@ const codaApi = {
       console.error('Error fetching column metadata:', error.response?.data || error.message);
       throw error;
     }
+  },
+
+  // Get all pages in a document
+  getPages: async (docId) => {
+    try {
+      // First get all pages
+      const pagesResponse = await axios.get(`${CODA_API_BASE_URL}/docs/${docId}/pages`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+
+      // Then get all tables in the document
+      const tablesResponse = await axios.get(`${CODA_API_BASE_URL}/docs/${docId}/tables`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+
+      // Get table metadata to associate tables with pages
+      const tablesWithMetadata = await Promise.all(
+        tablesResponse.data.items.map(async (table) => {
+          try {
+            const metadata = await axios.get(
+              `${CODA_API_BASE_URL}/docs/${docId}/tables/${table.id}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                }
+              }
+            );
+            return {
+              ...table,
+              parent: metadata.data.parent
+            };
+          } catch (error) {
+            console.error(`Error fetching metadata for table ${table.id}:`, error);
+            return table;
+          }
+        })
+      );
+
+      // Associate tables with their pages
+      const pagesWithTables = pagesResponse.data.items.map(page => ({
+        ...page,
+        tables: tablesWithMetadata.filter(table => table.parent?.id === page.id)
+      }));
+
+      return {
+        ...pagesResponse.data,
+        items: pagesWithTables
+      };
+    } catch (error) {
+      console.error('Error fetching pages:', error);
+      throw error;
+    }
   }
 };
 
