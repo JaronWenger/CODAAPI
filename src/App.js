@@ -145,21 +145,26 @@ function App() {
 
   const EditableCell = ({ row, column, value }) => {
     const isEditing = editingCell?.rowId === row.id && editingCell?.columnId === column.id;
+    const isLongText = value && value.length > 30;
 
     if (isEditing) {
       return (
         <Box sx={{ position: 'relative', height: '24px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-          <Box sx={{ position: 'absolute', left: 0, width: '120px' }}>
+          <Box sx={{ position: 'absolute', left: 0, width: isLongText ? '200px' : '120px' }}>
             <TextField
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={() => handleCellEdit(editValue)}
               onKeyPress={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
                   handleCellEdit(editValue);
                 }
               }}
               autoFocus
+              multiline={isLongText}
+              minRows={isLongText ? 1 : 1}
+              maxRows={isLongText ? 4 : 1}
               size="small"
               sx={{
                 width: '100%',
@@ -167,15 +172,28 @@ function App() {
                   width: '100%',
                   margin: 0,
                   padding: 0,
-                  height: '28px'
+                  minHeight: isLongText ? '28px' : '28px',
+                  backgroundColor: '#1e1e1e',
+                  position: 'relative',
+                  zIndex: 1
                 },
                 '& .MuiInputBase-input': {
                   textAlign: 'left',
                   padding: '2px 8px',
-                  height: '28px'
+                  minHeight: isLongText ? '28px' : '28px'
                 }
               }}
             />
+          </Box>
+          <Box
+            sx={{
+              position: 'absolute',
+              left: 0,
+              width: '100%',
+              zIndex: 0
+            }}
+          >
+            {value ?? ''}
           </Box>
         </Box>
       );
@@ -189,7 +207,9 @@ function App() {
           minHeight: '24px',
           width: '100%',
           display: 'flex',
-          alignItems: 'center'
+          alignItems: 'center',
+          wordBreak: 'break-word',
+          whiteSpace: 'normal'
         }}
       >
         {value ?? ''}
@@ -405,7 +425,15 @@ function App() {
               <TableHead>
                 <TableRow>
                   {columns.map((column) => (
-                    <TableCell key={column.id}>
+                    <TableCell 
+                      key={column.id}
+                      sx={{ 
+                        width: '200px',
+                        maxWidth: '200px',
+                        whiteSpace: 'normal',
+                        wordBreak: 'break-word'
+                      }}
+                    >
                       {column.name}
                     </TableCell>
                   ))}
@@ -417,7 +445,15 @@ function App() {
                   .map((row) => (
                     <TableRow key={row.id}>
                       {columns.map((column) => (
-                        <TableCell key={column.id}>
+                        <TableCell 
+                          key={column.id}
+                          sx={{ 
+                            width: '200px',
+                            maxWidth: '200px',
+                            whiteSpace: 'normal',
+                            wordBreak: 'break-word'
+                          }}
+                        >
                           <EditableCell
                             row={row}
                             column={column}
