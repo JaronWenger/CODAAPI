@@ -226,6 +226,32 @@ const codaApi = {
       console.error('Error fetching pages:', error);
       throw error;
     }
+  },
+
+  updateCell: async (docId, tableId, rowId, columnId, value) => {
+    try {
+      const response = await axios.put(
+        `${CODA_API_BASE_URL}/docs/${docId}/tables/${tableId}/rows/${rowId}`,
+        { 
+          row: {
+            cells: [{
+              column: columnId,
+              value: value
+            }]
+          }
+        },
+        { 
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error updating cell:', error);
+      throw error;
+    }
   }
 };
 

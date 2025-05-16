@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { Container, Typography, Paper, CircularProgress, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, Tooltip } from '@mui/material';
+import { Container, Typography, Paper, CircularProgress, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, Tooltip, TextField } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -26,6 +26,9 @@ function App() {
   const [selectedTableId, setSelectedTableId] = useState('grid-AugbPR9_CK');
   const [isStructureExpanded, setIsStructureExpanded] = useState(false);
   const [docId] = useState('aICF0Nr9qq');
+  const [editingCell, setEditingCell] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
   //////https://coda.io/d/Jarons-Coda-Playground_daICF0Nr9qq/Arbitrary-Data_suspmNrM#New-Table_tu75UX0j//////////
 
   const fetchPages = async () => {
@@ -101,6 +104,97 @@ function App() {
     setSelectedTableId(tableId);
     setIsStructureExpanded(false);
     fetchData(tableId);
+  };
+
+  const handleCellDoubleClick = (rowId, columnId, value) => {
+    setEditingCell({ rowId, columnId });
+    setEditValue(value);
+  };
+
+  const handleCellEdit = async (newValue) => {
+    if (!editingCell) return;
+    
+    try {
+      // Update local state immediately
+      setData(prevData => ({
+        ...prevData,
+        rows: {
+          ...prevData.rows,
+          items: prevData.rows.items.map(row => 
+            row.id === editingCell.rowId 
+              ? {
+                  ...row,
+                  values: {
+                    ...row.values,
+                    [editingCell.columnId]: newValue
+                  }
+                }
+              : row
+          )
+        }
+      }));
+      
+      // Then update the API in the background
+      await codaApi.updateCell(docId, selectedTableId, editingCell.rowId, editingCell.columnId, newValue);
+    } catch (error) {
+      console.error('Error updating cell:', error);
+    } finally {
+      setEditingCell(null);
+    }
+  };
+
+  const EditableCell = ({ row, column, value }) => {
+    const isEditing = editingCell?.rowId === row.id && editingCell?.columnId === column.id;
+
+    if (isEditing) {
+      return (
+        <Box sx={{ position: 'relative', height: '24px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+          <Box sx={{ position: 'absolute', left: 0, width: '120px' }}>
+            <TextField
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={() => handleCellEdit(editValue)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleCellEdit(editValue);
+                }
+              }}
+              autoFocus
+              size="small"
+              sx={{
+                width: '100%',
+                '& .MuiInputBase-root': {
+                  width: '100%',
+                  margin: 0,
+                  padding: 0,
+                  height: '28px'
+                },
+                '& .MuiInputBase-input': {
+                  textAlign: 'left',
+                  padding: '2px 8px',
+                  height: '28px'
+                }
+              }}
+            />
+          </Box>
+        </Box>
+      );
+    }
+
+    return (
+      <Box
+        onDoubleClick={() => handleCellDoubleClick(row.id, column.id, value ?? '')}
+        sx={{
+          cursor: 'pointer',
+          minHeight: '24px',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center'
+        }}
+      >
+        {value ?? ''}
+      </Box>
+    );
   };
 
   if (loading) {
@@ -324,7 +418,11 @@ function App() {
                     <TableRow key={row.id}>
                       {columns.map((column) => (
                         <TableCell key={column.id}>
-                          {row.values[column.id]}
+                          <EditableCell
+                            row={row}
+                            column={column}
+                            value={row.values[column.id]}
+                          />
                         </TableCell>
                       ))}
                     </TableRow>
