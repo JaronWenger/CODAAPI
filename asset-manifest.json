@@ -1,0 +1,10 @@
+{
+  "files": {
+    "main.js": "/CODAAPI/static/js/main.fbc49b8b.js",
+    "index.html": "/CODAAPI/index.html",
+    "main.fbc49b8b.js.map": "/CODAAPI/static/js/main.fbc49b8b.js.map"
+  },
+  "entrypoints": [
+    "static/js/main.fbc49b8b.js"
+  ]
+}
