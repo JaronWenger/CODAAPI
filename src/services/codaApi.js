@@ -5,9 +5,7 @@ const CODA_API_BASE_URL = 'https://coda.io/apis/v1';
 // Debug: Log the token (first few characters only)
 const token = process.env.REACT_APP_CODA_API_TOKEN;
 console.log('Token available:', token ? 'Yes' : 'No');
-if (token) {
-  console.log('Token starts with:', token.substring(0, 4) + '...');
-}
+console.log('Token first 4 chars:', token ? token.substring(0, 4) : 'None');
 
 // Test function to verify API access
 const testApiAccess = async () => {
@@ -21,10 +19,10 @@ const testApiAccess = async () => {
         },
       }
     );
-    console.log('API Access Test:', response.data);
+    console.log('API Test Response:', response.data);
     return response.data;
   } catch (error) {
-    console.error('API Access Test Failed:', error.response?.data || error.message);
+    console.error('API Test Error:', error.response?.data || error.message);
     throw error;
   }
 };
@@ -86,14 +84,17 @@ const codaApi = {
         throw new Error('API token is missing. Please check your .env file.');
       }
 
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+      
+      console.log('Making request to:', `${CODA_API_BASE_URL}/docs/${docId}/tables/${tableId}/rows`);
+      console.log('With headers:', { ...headers, Authorization: 'Bearer [REDACTED]' });
+
       const response = await axios.get(
         `${CODA_API_BASE_URL}/docs/${docId}/tables/${tableId}/rows`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers }
       );
       return response.data;
     } catch (error) {

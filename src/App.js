@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { Container, Typography, Paper, CircularProgress, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button } from '@mui/material';
+import { Container, Typography, Paper, CircularProgress, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, Tooltip } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import ErrorIcon from '@mui/icons-material/Error';
 import codaApi from './services/codaApi';
+import domoApi from './services/domoApi';
 
 const theme = createTheme({
   palette: {
@@ -15,12 +18,21 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [columns, setColumns] = useState([]);
+  const [domoError, setDomoError] = useState(null);
+  const [isPushingToDomo, setIsPushingToDomo] = useState(false);
+  //////////////////////////////////////////CODA DOC ID////////////////////////////////////////////////////////
+  const [docId] = useState('aICF0Nr9qq');
+  //////https://coda.io/d/Jarons-Coda-Playground_daICF0Nr9qq/Arbitrary-Data_suspmNrM#New-Table_tu75UX0j//////////
+
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const docId = 'aICF0Nr9qq';
-      const tableId = 'grid-AugbPR9_CK';
+  ///////////////////////////////////////CODA TABLE IDS///////////////////////////////////////////////////////////
+      //const tableId = 'grid-AugbPR9_CK';  //first DATA TABLE
+      const tableId = 'grid-VhEQ75UX0j';  //second test
+  //////Must pull table ID from Elements in DEV Tools data-object-id="grid-AugbPR9_CK"//////////////////////////
+
       
       const [tableMetadata, columnMetadata, rows] = await Promise.all([
         codaApi.getTableMetadata(docId, tableId),
@@ -61,6 +73,19 @@ function App() {
     }
   };
 
+  const pushToDomo = async () => {
+    try {
+      setIsPushingToDomo(true);
+      setDomoError(null);
+      await domoApi.pushData({ rows: data.rows, columns });
+    } catch (err) {
+      console.error('Error pushing to Domo:', err);
+      setDomoError(err.message || 'Failed to connect to Domo');
+    } finally {
+      setIsPushingToDomo(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -92,8 +117,13 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <Container>
-        <Box display="flex" alignItems="center" gap={2} mb={2}>
-          <Typography variant="h4">
+        <Box display="flex" alignItems="center" gap={2} mb={2} sx={{ mt: 4 }}>
+          <Typography variant="h4" sx={{
+            color: '#ffffff',
+            textShadow: '0 0 .2px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.5)',
+            fontWeight: 'bold',
+            letterSpacing: '1px'
+          }}>
             Coda API Data
           </Typography>
           <Button 
@@ -103,21 +133,41 @@ function App() {
           >
             Refresh
           </Button>
+          <Box display="flex" alignItems="center" gap={1}>
+            <Button 
+              variant="contained" 
+              color="secondary"
+              startIcon={<CloudUploadIcon />}
+              onClick={pushToDomo}
+              disabled={isPushingToDomo || !data}
+            >
+              Push to Domo
+            </Button>
+            {domoError && (
+              <Tooltip title={domoError}>
+                <ErrorIcon color="error" />
+              </Tooltip>
+            )}
+          </Box>
         </Box>
+
+{/*///////////Structure block////////////////////////////////////////////////////*/}
         <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
           <Typography variant="h6" gutterBottom>
             Structure
           </Typography>
           <Typography variant="body1">
-            Document: Jaron's Coda Playground (ID: aICF0Nr9qq)
+            Document: (ID: {docId})
           </Typography>
           <Typography variant="body1" sx={{ ml: 2 }}>
-            └─ Page: DOMO DATA (ID: canvas-ZhoXyCGPLH)
+            └─ Page: {data?.metadata?.parent?.name} (ID: {data?.metadata?.parent?.id})
           </Typography>
           <Typography variant="body1" sx={{ ml: 4 }}>
-            └─ Table: Data (ID: grid-AugbPR9_CK)
+            └─ Table: {data?.metadata?.name} (ID: {data?.metadata?.id})
           </Typography>
         </Paper>
+
+{/*///////////Table block////////////////////////////////////////////////////*/}
         <Paper elevation={3} sx={{ p: 3, mt: 2 }}>
           <Typography variant="h6" gutterBottom>
             Table: {data?.metadata?.name}
@@ -125,7 +175,6 @@ function App() {
           <Typography variant="subtitle2" gutterBottom>
             Page: {data?.metadata?.parent?.name}
           </Typography>
-          
           <TableContainer component={Paper} sx={{ mt: 2 }}>
             <Table>
               <TableHead>
@@ -154,6 +203,9 @@ function App() {
           </TableContainer>
         </Paper>
 
+
+
+{/*///////////Data block////////////////////////////////////////////////////*/} 
         <Paper elevation={3} sx={{ p: 3, mt: 4 }}>
           <Typography variant="h6" gutterBottom>
             Raw Data
@@ -161,14 +213,24 @@ function App() {
           <Typography variant="subtitle2" gutterBottom>
             Table Metadata
           </Typography>
-          <pre>
+          <pre style={{ 
+            overflowX: 'auto', 
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+            maxWidth: '100%'
+          }}>
             {JSON.stringify(data?.metadata, null, 2)}
           </pre>
           
           <Typography variant="subtitle2" gutterBottom sx={{ mt: 4 }}>
             Table Rows
           </Typography>
-          <pre>
+          <pre style={{ 
+            overflowX: 'auto', 
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+            maxWidth: '100%'
+          }}>
             {JSON.stringify(data?.rows, null, 2)}
           </pre>
         </Paper>
