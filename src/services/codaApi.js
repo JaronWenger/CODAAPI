@@ -40,7 +40,12 @@ const listDocuments = async () => {
       }
     );
     console.log('Accessible Documents:', response.data);
-    return response.data;
+    // Add browserUrl to each document
+    const docsWithUrls = response.data.items.map(doc => ({
+      ...doc,
+      browserUrl: `https://coda.io/d/${doc.id}`
+    }));
+    return { ...response.data, items: docsWithUrls };
   } catch (error) {
     console.error('Error listing documents:', error.response?.data || error.message);
     throw error;

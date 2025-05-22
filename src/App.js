@@ -25,11 +25,23 @@ function App() {
   const [pages, setPages] = useState([]);
   const [selectedTableId, setSelectedTableId] = useState('grid-AugbPR9_CK');
   const [isStructureExpanded, setIsStructureExpanded] = useState(false);
-  const [docId] = useState('aICF0Nr9qq');
+  const [docId, setDocId] = useState('aICF0Nr9qq');
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [isDocumentsExpanded, setIsDocumentsExpanded] = useState(false);
   //////https://coda.io/d/Jarons-Coda-Playground_daICF0Nr9qq/Arbitrary-Data_suspmNrM#New-Table_tu75UX0j//////////
+
+  const fetchDocuments = async () => {
+    try {
+      const docsData = await codaApi.listDocs();
+      console.log('Documents data:', docsData);
+      setDocuments(docsData.items || []);
+    } catch (err) {
+      console.error('Error fetching documents:', err);
+    }
+  };
 
   const fetchPages = async () => {
     try {
@@ -41,13 +53,13 @@ function App() {
     }
   };
 
-  const fetchData = async (tableId = selectedTableId) => {
+  const fetchData = async (tableId = selectedTableId, currentDocId = docId) => {
     try {
       setLoading(true);
       const [tableMetadata, columnMetadata, rows] = await Promise.all([
-        codaApi.getTableMetadata(docId, tableId),
-        codaApi.getColumnMetadata(docId, tableId),
-        codaApi.getTableRows(docId, tableId)
+        codaApi.getTableMetadata(currentDocId, tableId),
+        codaApi.getColumnMetadata(currentDocId, tableId),
+        codaApi.getTableRows(currentDocId, tableId)
       ]);
 
       // Define the known column order
@@ -78,6 +90,9 @@ function App() {
       console.error('Error details:', err);
       setError(err.message);
       setLoading(false);
+      // Clear data on error
+      setData(null);
+      setColumns([]);
     }
   };
 
@@ -95,10 +110,44 @@ function App() {
   };
 
   useEffect(() => {
+    fetchDocuments();
     fetchPages();
     fetchData();
     setIsStructureExpanded(false);
   }, []);
+
+  const handleDocumentSelect = async (newDocId) => {
+    // Clear current data and show loading state
+    setData(null);
+    setColumns([]);
+    setSelectedTableId(null);
+    setLoading(true);
+    setError(null);
+    
+    // Update document
+    setDocId(newDocId);
+    setIsDocumentsExpanded(false);
+    
+    try {
+      // Get pages and find the first table
+      const pagesData = await codaApi.getPages(newDocId);
+      setPages(pagesData.items || []);
+      
+      // Find the first available table
+      const firstPageWithTable = pagesData.items?.find(page => page.tables?.length > 0);
+      if (firstPageWithTable?.tables?.[0]) {
+        const firstTable = firstPageWithTable.tables[0];
+        setSelectedTableId(firstTable.id);
+        await fetchData(firstTable.id, newDocId);
+      } else {
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error loading document:', error);
+      setError('Error loading document. Please try again.');
+      setLoading(false);
+    }
+  };
 
   const handleTableClick = (tableId) => {
     setSelectedTableId(tableId);
@@ -252,7 +301,7 @@ function App() {
             letterSpacing: '1px',
             textAlign: { xs: 'center', sm: 'left' }
           }}>
-            Coda API Data
+            Coda Link
           </Typography>
           <Box sx={{ 
             display: 'flex', 
@@ -284,8 +333,22 @@ function App() {
             <Button 
               variant="contained" 
               color="secondary"
-              onClick={pushToDomo}
-              disabled={isPushingToDomo || !data}
+              onClick={() => {
+                const docName = documents.find(doc => doc.id === docId)?.name
+                  ?.replace(/['"]/g, '') // Remove quotes and apostrophes
+                  ?.replace(/\s+/g, '-'); // Replace spaces with hyphens
+                const selectedPage = pages.find(page => 
+                  page.id === data?.metadata?.parent?.id || 
+                  page.tables?.some(table => table.id === selectedTableId)
+                );
+                const pageName = selectedPage?.name
+                  ?.replace(/['"]/g, '')
+                  ?.replace(/\s+/g, '-');
+                const url = `https://coda.io/d/${docName}_d${docId}/${pageName}`;
+                console.log('Opening Coda URL:', url);
+                window.open(url, '_blank', 'noopener,noreferrer');
+              }}
+              disabled={!documents.find(doc => doc.id === docId)?.name || !data?.metadata?.parent?.name}
               sx={{
                 minWidth: { xs: 'auto', sm: 'inherit' },
                 p: { xs: 1, sm: 1 },
@@ -295,14 +358,9 @@ function App() {
               <CloudUploadIcon sx={{ display: { xs: 'block', sm: 'none' } }} />
               <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
                 <CloudUploadIcon />
-                Push to Domo
+                Open Coda
               </Box>
             </Button>
-            {domoError && (
-              <Tooltip title={domoError}>
-                <ErrorIcon color="error" />
-              </Tooltip>
-            )}
           </Box>
         </Box>
 
@@ -325,8 +383,29 @@ function App() {
             />
           </Box>
           <Typography variant="body1">
-            Document: (ID: {docId})
+            Document: <strong>{documents.find(doc => doc.id === docId)?.name || 'Loading...'}</strong> (ID: {docId})
           </Typography>
+          {isStructureExpanded && documents && documents.length > 0 && (
+            <Box sx={{ ml: 4 }}>
+              {documents.map((doc) => (
+                <Typography 
+                  key={doc.id} 
+                  variant="body1" 
+                  sx={{ 
+                    cursor: 'pointer',
+                    color: doc.id === docId ? 'primary.main' : 'secondary.main',
+                    '&:hover': {
+                      color: 'primary.main',
+                      textDecoration: 'underline'
+                    }
+                  }}
+                  onClick={() => handleDocumentSelect(doc.id)}
+                >
+                  {doc.id === docId ? '▶ ' : ''}└─ {doc.name} (ID: {doc.id})
+                </Typography>
+              ))}
+            </Box>
+          )}
           {isStructureExpanded && pages && pages.length > 0 ? (
             pages.map((page) => {
               // Check if this is a subpage
@@ -338,7 +417,7 @@ function App() {
                 return (
                   <Box key={page.id}>
                     <Typography variant="body1" sx={{ ml: 2 }}>
-                      └─ Page: {page.name} (ID: {page.id})
+                      {page.id === data?.metadata?.parent?.id ? '▶ ' : ''}└─ Page: {page.name} (ID: {page.id})
                     </Typography>
                     {/* Show subpages */}
                     {pages
@@ -346,7 +425,7 @@ function App() {
                       .map(subpage => (
                         <Box key={subpage.id}>
                           <Typography variant="body1" sx={{ ml: 4 }}>
-                            └─ Page: {subpage.name} (ID: {subpage.id})
+                            {subpage.id === data?.metadata?.parent?.id ? '▶ ' : ''}└─ Page: {subpage.name} (ID: {subpage.id})
                           </Typography>
                           {/* Show tables for this subpage */}
                           {subpage.tables && subpage.tables.length > 0 && (
@@ -365,7 +444,7 @@ function App() {
                                 }}
                                 onClick={() => handleTableClick(table.id)}
                               >
-                                └─ Table: {table.name} (ID: {table.id})
+                                {table.id === selectedTableId ? '▶ ' : ''}└─ Table: {table.name} (ID: {table.id})
                               </Typography>
                             ))
                           )}
@@ -388,7 +467,7 @@ function App() {
                           }}
                           onClick={() => handleTableClick(table.id)}
                         >
-                          └─ Table: {table.name} (ID: {table.id})
+                          {table.id === selectedTableId ? '▶ ' : ''}└─ Table: {table.name} (ID: {table.id})
                         </Typography>
                       ))
                     )}
@@ -415,56 +494,64 @@ function App() {
 
         <Paper elevation={3} sx={{ p: 3, mt: 2 }}>
           <Typography variant="h6" gutterBottom>
-            Table: {data?.metadata?.name}
+            Table: {data?.metadata?.name || 'Select a table'}
           </Typography>
           <Typography variant="subtitle2" gutterBottom>
-            Page: {data?.metadata?.parent?.name}
+            Page: {data?.metadata?.parent?.name || 'No page selected'}
           </Typography>
           <TableContainer component={Paper} sx={{ mt: 2 }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  {columns.map((column) => (
-                    <TableCell 
-                      key={column.id}
-                      sx={{ 
-                        width: '200px',
-                        maxWidth: '200px',
-                        whiteSpace: 'normal',
-                        wordBreak: 'break-word'
-                      }}
-                    >
-                      {column.name}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data?.rows?.items
-                  ?.sort((a, b) => a.index - b.index)
-                  .map((row) => (
-                    <TableRow key={row.id}>
-                      {columns.map((column) => (
-                        <TableCell 
-                          key={column.id}
-                          sx={{ 
-                            width: '200px',
-                            maxWidth: '200px',
-                            whiteSpace: 'normal',
-                            wordBreak: 'break-word'
-                          }}
-                        >
-                          <EditableCell
-                            row={row}
-                            column={column}
-                            value={row.values[column.id]}
-                          />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
+            {data ? (
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    {columns.map((column) => (
+                      <TableCell 
+                        key={column.id}
+                        sx={{ 
+                          width: '200px',
+                          maxWidth: '200px',
+                          whiteSpace: 'normal',
+                          wordBreak: 'break-word'
+                        }}
+                      >
+                        {column.name}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data?.rows?.items
+                    ?.sort((a, b) => a.index - b.index)
+                    .map((row) => (
+                      <TableRow key={row.id}>
+                        {columns.map((column) => (
+                          <TableCell 
+                            key={column.id}
+                            sx={{ 
+                              width: '200px',
+                              maxWidth: '200px',
+                              whiteSpace: 'normal',
+                              wordBreak: 'break-word'
+                            }}
+                          >
+                            <EditableCell
+                              row={row}
+                              column={column}
+                              value={row.values[column.id]}
+                            />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <Box sx={{ p: 2, textAlign: 'center' }}>
+                <Typography color="text.secondary">
+                  Select a table from the structure to view its data
+                </Typography>
+              </Box>
+            )}
           </TableContainer>
         </Paper>
 
