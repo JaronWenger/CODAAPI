@@ -299,7 +299,8 @@ function App() {
             textShadow: '0 0 .2px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.5)',
             fontWeight: 'bold',
             letterSpacing: '1px',
-            textAlign: { xs: 'center', sm: 'left' }
+            textAlign: { xs: 'center', sm: 'left' },
+            flex: { xs: '1 1 100%', sm: 'none' }
           }}>
             Coda Link
           </Typography>
