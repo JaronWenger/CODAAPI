@@ -195,11 +195,31 @@ function App() {
   const EditableCell = ({ row, column, value }) => {
     const isEditing = editingCell?.rowId === row.id && editingCell?.columnId === column.id;
     const textInputRef = React.useRef(null);
+    const [hasSetCursor, setHasSetCursor] = React.useState(false);
+
+    React.useEffect(() => {
+      if (isEditing) setHasSetCursor(false);
+    }, [isEditing]);
+
+    React.useEffect(() => {
+      if (isEditing && textInputRef.current && !hasSetCursor) {
+        const input = textInputRef.current;
+        const len = editValue ? editValue.length : 0;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (input.setSelectionRange) {
+              input.setSelectionRange(len, len);
+            }
+          });
+        });
+        setHasSetCursor(true);
+      }
+      // DO NOT include editValue in the dependency array!
+      // eslint-disable-next-line
+    }, [isEditing, hasSetCursor]);
 
     return (
       <Box
-        ref={textInputRef}
-        onDoubleClick={() => handleCellDoubleClick(row.id, column.id, value ?? '')}
         sx={{
           cursor: 'pointer',
           minHeight: '24px',
@@ -211,8 +231,8 @@ function App() {
           position: 'relative',
           p: 0,
         }}
+        onDoubleClick={() => handleCellDoubleClick(row.id, column.id, value ?? '')}
       >
-        {/* Always render the content, but hide it when editing to preserve height */}
         <span
           style={{
             width: '100%',
