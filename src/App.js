@@ -194,62 +194,30 @@ function App() {
 
   const EditableCell = ({ row, column, value }) => {
     const isEditing = editingCell?.rowId === row.id && editingCell?.columnId === column.id;
-    const isLongText = value && value.length > 30;
+    const cellRef = React.useRef(null);
+    const textInputRef = React.useRef(null);
+    const didSetCursor = React.useRef(false);
 
-    if (isEditing) {
-      return (
-        <Box sx={{ position: 'relative', height: '24px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-          <Box sx={{ position: 'absolute', left: 0, width: isLongText ? '200px' : '120px' }}>
-            <TextField
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onBlur={() => handleCellEdit(editValue)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleCellEdit(editValue);
-                }
-              }}
-              autoFocus
-              multiline={isLongText}
-              minRows={isLongText ? 1 : 1}
-              maxRows={isLongText ? 4 : 1}
-              size="small"
-              sx={{
-                width: '100%',
-                '& .MuiInputBase-root': {
-                  width: '100%',
-                  margin: 0,
-                  padding: 0,
-                  minHeight: isLongText ? '28px' : '28px',
-                  backgroundColor: '#1e1e1e',
-                  position: 'relative',
-                  zIndex: 1
-                },
-                '& .MuiInputBase-input': {
-                  textAlign: 'left',
-                  padding: '2px 8px',
-                  minHeight: isLongText ? '28px' : '28px'
-                }
-              }}
-            />
-          </Box>
-          <Box
-            sx={{
-              position: 'absolute',
-              left: 0,
-              width: '100%',
-              zIndex: 0
-            }}
-          >
-            {value ?? ''}
-          </Box>
-        </Box>
-      );
-    }
+    React.useEffect(() => {
+      didSetCursor.current = false;
+    }, [isEditing]);
+
+    React.useEffect(() => {
+      if (isEditing && textInputRef.current && !didSetCursor.current) {
+        const input = textInputRef.current;
+        const len = editValue ? editValue.length : 0;
+        setTimeout(() => {
+          if (input.setSelectionRange) {
+            input.setSelectionRange(len, len);
+          }
+        }, 0);
+        didSetCursor.current = true;
+      }
+    }, [isEditing]);
 
     return (
       <Box
+        ref={cellRef}
         onDoubleClick={() => handleCellDoubleClick(row.id, column.id, value ?? '')}
         sx={{
           cursor: 'pointer',
@@ -258,10 +226,95 @@ function App() {
           display: 'flex',
           alignItems: 'center',
           wordBreak: 'break-word',
-          whiteSpace: 'normal'
+          whiteSpace: 'normal',
+          position: 'relative',
+          p: 0,
         }}
       >
-        {value ?? ''}
+        {/* Always render the content, but hide it when editing to preserve height */}
+        <span
+          style={{
+            width: '100%',
+            overflowWrap: 'break-word',
+            fontSize: '1rem',
+            fontFamily: 'inherit',
+            opacity: isEditing ? 0 : 1,
+            transition: 'opacity 0.1s',
+            userSelect: isEditing ? 'none' : 'auto',
+            pointerEvents: isEditing ? 'none' : 'auto',
+          }}
+        >
+          {value ?? ''}
+        </span>
+        {isEditing && (
+          <TextField
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={() => handleCellEdit(editValue)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleCellEdit(editValue);
+              }
+            }}
+            autoFocus
+            size="small"
+            multiline
+            minRows={1}
+            maxRows={10}
+            fullWidth
+            inputRef={textInputRef}
+            InputProps={{
+              inputProps: {
+                style: {
+                  textAlign: 'left',
+                  direction: 'ltr',
+                  fontSize: '1rem',
+                  fontFamily: 'inherit',
+                },
+              },
+            }}
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: '-8px',
+              width: 'calc(100% + 16px)',
+              minWidth: '120px',
+              maxWidth: '700px',
+              backgroundColor: 'background.paper',
+              border: '1.5px solid transparent',
+              borderRadius: 2,
+              fontSize: '1rem',
+              fontFamily: 'inherit',
+              boxShadow: 4,
+              zIndex: 10,
+              transition: 'border-color 0.2s',
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                p: 0,
+                fontSize: '1rem',
+                fontFamily: 'inherit',
+                backgroundColor: 'background.paper',
+                '& fieldset': {
+                  borderColor: 'transparent',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#42a5f5',
+                  borderWidth: 2,
+                },
+              },
+              '& .MuiInputBase-input': {
+                padding: '8px 12px',
+                fontSize: '1rem',
+                fontFamily: 'inherit',
+                lineHeight: 1.4,
+                textAlign: 'left',
+                direction: 'ltr',
+                backgroundColor: 'background.paper',
+              },
+            }}
+          />
+        )}
       </Box>
     );
   };
