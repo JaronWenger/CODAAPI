@@ -500,19 +500,30 @@ function App() {
           <Typography variant="subtitle2" gutterBottom>
             Page: {data?.metadata?.parent?.name || 'No page selected'}
           </Typography>
-          <TableContainer component={Paper} sx={{ mt: 2 }}>
+          <TableContainer 
+            component={Paper} 
+            sx={{ 
+              mt: 2,
+              overflowX: 'auto'
+            }}
+          >
             {data ? (
-              <Table>
+              <Table sx={{ 
+                tableLayout: 'auto',
+                width: 'max-content'
+              }}>
                 <TableHead>
                   <TableRow>
                     {columns.map((column) => (
                       <TableCell 
                         key={column.id}
                         sx={{ 
-                          width: '200px',
-                          maxWidth: '200px',
+                          width: 'auto',
+                          minWidth: '80px',
+                          maxWidth: '400px',
                           whiteSpace: 'normal',
-                          wordBreak: 'break-word'
+                          wordBreak: 'break-word',
+                          padding: '8px 12px'
                         }}
                       >
                         {column.name}
@@ -529,10 +540,12 @@ function App() {
                           <TableCell 
                             key={column.id}
                             sx={{ 
-                              width: '200px',
-                              maxWidth: '200px',
+                              width: 'auto',
+                              minWidth: '80px',
+                              maxWidth: '400px',
                               whiteSpace: 'normal',
-                              wordBreak: 'break-word'
+                              wordBreak: 'break-word',
+                              padding: '8px 12px'
                             }}
                           >
                             <EditableCell
