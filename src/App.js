@@ -157,7 +157,7 @@ function App() {
 
   const handleCellDoubleClick = (rowId, columnId, value) => {
     setEditingCell({ rowId, columnId });
-    setEditValue(value);
+    setEditValue(String(value ?? ''));
   };
 
   const handleCellEdit = async (newValue) => {
@@ -194,30 +194,11 @@ function App() {
 
   const EditableCell = ({ row, column, value }) => {
     const isEditing = editingCell?.rowId === row.id && editingCell?.columnId === column.id;
-    const cellRef = React.useRef(null);
     const textInputRef = React.useRef(null);
-    const didSetCursor = React.useRef(false);
-
-    React.useEffect(() => {
-      didSetCursor.current = false;
-    }, [isEditing]);
-
-    React.useEffect(() => {
-      if (isEditing && textInputRef.current && !didSetCursor.current) {
-        const input = textInputRef.current;
-        const len = editValue ? editValue.length : 0;
-        setTimeout(() => {
-          if (input.setSelectionRange) {
-            input.setSelectionRange(len, len);
-          }
-        }, 0);
-        didSetCursor.current = true;
-      }
-    }, [isEditing]);
 
     return (
       <Box
-        ref={cellRef}
+        ref={textInputRef}
         onDoubleClick={() => handleCellDoubleClick(row.id, column.id, value ?? '')}
         sx={{
           cursor: 'pointer',
@@ -248,7 +229,8 @@ function App() {
         </span>
         {isEditing && (
           <TextField
-            value={editValue}
+            type="text"
+            value={String(editValue ?? '')}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={() => handleCellEdit(editValue)}
             onKeyPress={(e) => {
