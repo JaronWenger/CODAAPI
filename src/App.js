@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { Container, Typography, Paper, CircularProgress, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, Tooltip, TextField } from '@mui/material';
+import { Container, Typography, Paper, CircularProgress, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, Tooltip, TextField, Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -31,6 +31,9 @@ function App() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [isDocumentsExpanded, setIsDocumentsExpanded] = useState(false);
+  const [mobileEditDialog, setMobileEditDialog] = useState(false);
+  const [mobileEditData, setMobileEditData] = useState({ rowId: null, columnId: null, value: '', columnName: '' });
+  const [hasSetInitialCursor, setHasSetInitialCursor] = useState(false);
   //////https://coda.io/d/Jarons-Coda-Playground_daICF0Nr9qq/Arbitrary-Data_suspmNrM#New-Table_tu75UX0j//////////
 
   const fetchDocuments = async () => {
@@ -155,9 +158,24 @@ function App() {
     fetchData(tableId);
   };
 
+  const isMobile = useMediaQuery('(max-width:600px)');
+
   const handleCellDoubleClick = (rowId, columnId, value) => {
-    setEditingCell({ rowId, columnId });
-    setEditValue(String(value ?? ''));
+    if (isMobile) {
+      // Mobile: Open dialog
+      setMobileEditData({
+        rowId,
+        columnId,
+        value: String(value ?? ''),
+        columnName: columns.find(col => col.id === columnId)?.name || 'Cell'
+      });
+      setMobileEditDialog(true);
+      setHasSetInitialCursor(false);
+    } else {
+      // Desktop: Inline editing (unchanged)
+      setEditingCell({ rowId, columnId });
+      setEditValue(String(value ?? ''));
+    }
   };
 
   const handleCellEdit = async (newValue) => {
@@ -189,6 +207,39 @@ function App() {
       console.error('Error updating cell:', error);
     } finally {
       setEditingCell(null);
+    }
+  };
+
+  const handleMobileCellEdit = async (newValue) => {
+    if (!mobileEditData.rowId || !mobileEditData.columnId) return;
+    
+    try {
+      // Update local state immediately
+      setData(prevData => ({
+        ...prevData,
+        rows: {
+          ...prevData.rows,
+          items: prevData.rows.items.map(row => 
+            row.id === mobileEditData.rowId 
+              ? {
+                  ...row,
+                  values: {
+                    ...row.values,
+                    [mobileEditData.columnId]: newValue
+                  }
+                }
+              : row
+          )
+        }
+      }));
+      
+      // Then update the API in the background
+      await codaApi.updateCell(docId, selectedTableId, mobileEditData.rowId, mobileEditData.columnId, newValue);
+    } catch (error) {
+      console.error('Error updating cell:', error);
+    } finally {
+      setMobileEditDialog(false);
+      setMobileEditData({ rowId: null, columnId: null, value: '', columnName: '' });
     }
   };
 
@@ -652,6 +703,80 @@ function App() {
             {JSON.stringify(data?.rows, null, 2)}
           </pre>
         </Paper>
+
+        {/* Mobile Edit Dialog */}
+        <Dialog 
+          open={mobileEditDialog} 
+          onClose={() => setMobileEditDialog(false)}
+          fullWidth
+          maxWidth={false}
+          sx={{
+            '& .MuiDialog-container': {
+              alignItems: 'flex-start',
+              justifyContent: 'center',
+              paddingTop: '47%',
+            }
+          }}
+          PaperProps={{
+            sx: {
+              borderRadius: 0,
+              backgroundColor: 'background.paper',
+              boxShadow: 8,
+              maxHeight: 'calc(100vh - 20px)',
+              margin: 0,
+              width: '100vw',
+            }
+          }}
+        >
+          <DialogContent sx={{ p: 2 }}>
+            <TextField
+              autoFocus
+              multiline
+              minRows={3}
+              maxRows={8}
+              fullWidth
+              value={mobileEditData.value}
+              onChange={(e) => setMobileEditData(prev => ({ ...prev, value: e.target.value }))}
+              onBlur={() => {
+                handleMobileCellEdit(mobileEditData.value);
+                setMobileEditDialog(false);
+              }}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                  e.preventDefault();
+                  handleMobileCellEdit(mobileEditData.value);
+                  setMobileEditDialog(false);
+                }
+              }}
+              inputRef={(input) => {
+                if (input && !hasSetInitialCursor) {
+                  // Set cursor to end of text only once when dialog opens
+                  const len = mobileEditData.value.length;
+                  input.setSelectionRange(len, len);
+                  setHasSetInitialCursor(true);
+                }
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  fontSize: '1rem',
+                  fontFamily: 'inherit',
+                  '& fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.23)',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#42a5f5',
+                    borderWidth: 2,
+                  },
+                },
+                '& .MuiInputBase-input': {
+                  fontSize: '1rem',
+                  fontFamily: 'inherit',
+                  lineHeight: 1.5,
+                },
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       </Container>
     </ThemeProvider>
   );
